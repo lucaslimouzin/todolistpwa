@@ -5,15 +5,15 @@
 const CACHE_NAME = 'todolist-pwa-v1';
 
 const STATIC_ASSETS = [
-    '/',
-    '/index.html',
-    '/css/style.css',
-    '/js/app.js',
-    '/js/sw-register.js',
-    '/manifest.json',
-    '/images/icon-192x192.png',
-    '/images/icon-512x512.png',
-    '/images/favicon.ico'
+    './',
+    './index.html',
+    './css/style.css',
+    './js/app.js',
+    './js/sw-register.js',
+    './manifest.json',
+    './images/icon-192x192.png',
+    './images/icon-512x512.png',
+    './images/favicon.ico'
 ];
 
 // Installation du Service Worker

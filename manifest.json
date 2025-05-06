@@ -2,7 +2,7 @@
   "name": "TodoList PWA",
   "short_name": "TodoList",
   "description": "Une application de liste de tâches simple et efficace",
-  "start_url": "/",
+  "start_url": "./",
   "display": "standalone",
   "background_color": "#f5f5f5",
   "theme_color": "#4a90e2",
