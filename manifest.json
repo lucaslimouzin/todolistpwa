@@ -1,0 +1,33 @@
+{
+  "name": "TodoList PWA",
+  "short_name": "TodoList",
+  "description": "Une application de liste de tâches simple et efficace",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f5f5f5",
+  "theme_color": "#4a90e2",
+  "icons": [
+    {
+      "src": "images/icon-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "images/icon-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "orientation": "portrait",
+  "lang": "fr-FR",
+  "categories": ["productivity", "utilities"],
+  "screenshots": [
+    {
+      "src": "images/screenshot.png",
+      "sizes": "1280x720",
+      "type": "image/png"
+    }
+  ]
+} 
