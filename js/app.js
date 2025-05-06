@@ -14,17 +14,22 @@ const filterButtons = document.querySelectorAll('.filter-btn');
 const installBanner = document.getElementById('install-banner');
 const installBtn = document.getElementById('install-btn');
 const closeBannerBtn = document.getElementById('close-banner');
+const notificationsBanner = document.getElementById('notifications-banner');
+const enableNotificationsBtn = document.getElementById('enable-notifications');
+const closeNotificationsBannerBtn = document.getElementById('close-notifications-banner');
 
 // Variables globales
 let todos = [];
 let currentFilter = 'all';
 let deferredPrompt;
+let notificationPermission = 'default';
 
 // Fonctions principales
 function init() {
     loadTodos();
     renderTodos();
     addEventListeners();
+    checkNotificationPermission();
 }
 
 function addEventListeners() {
@@ -65,8 +70,94 @@ function addEventListeners() {
         }
     });
 
+    // Notifications
+    enableNotificationsBtn.addEventListener('click', requestNotificationPermission);
+    closeNotificationsBannerBtn.addEventListener('click', () => {
+        notificationsBanner.style.display = 'none';
+        localStorage.setItem('notificationBannerClosed', 'true');
+    });
+
     // Gestion des notifications provenant du service worker
     navigator.serviceWorker.addEventListener('message', handleServiceWorkerMessage);
+}
+
+// Vérifier la permission de notification
+function checkNotificationPermission() {
+    // Vérifier si les notifications sont supportées
+    if (!('Notification' in window)) {
+        console.log('Ce navigateur ne supporte pas les notifications desktop');
+        return;
+    }
+
+    // Vérifier la permission actuelle
+    notificationPermission = Notification.permission;
+    
+    // Si la permission est déjà accordée, on ne fait rien
+    if (notificationPermission === 'granted') {
+        console.log('Notifications déjà autorisées');
+        return;
+    }
+
+    // Si la permission a été refusée, on ne montre pas la bannière
+    if (notificationPermission === 'denied') {
+        console.log('Notifications refusées par l\'utilisateur');
+        return;
+    }
+
+    // Si la bannière a déjà été fermée, on ne la montre pas
+    if (localStorage.getItem('notificationBannerClosed') === 'true') {
+        return;
+    }
+
+    // Montrer la bannière de demande de permission
+    notificationsBanner.style.display = 'flex';
+}
+
+// Demander la permission pour les notifications
+async function requestNotificationPermission() {
+    try {
+        const permission = await Notification.requestPermission();
+        notificationPermission = permission;
+        
+        if (permission === 'granted') {
+            notificationsBanner.style.display = 'none';
+            showNotification('Notifications activées', 'Vous recevrez désormais des rappels pour vos tâches!');
+            
+            // Reprogrammer les notifications pour les tâches existantes
+            rescheduleTodosNotifications();
+        } else {
+            alert('Sans notifications, nous ne pourrons pas vous rappeler vos tâches à temps.');
+        }
+    } catch (error) {
+        console.error('Erreur lors de la demande de permission:', error);
+    }
+}
+
+// Afficher une notification
+function showNotification(title, body, data = {}) {
+    if (notificationPermission !== 'granted') return;
+
+    const options = {
+        body: body,
+        icon: './images/icon-192x192.png',
+        badge: './images/icon-192x192.png',
+        vibrate: [100, 50, 100],
+        data: data,
+        actions: [
+            {
+                action: 'complete',
+                title: 'Marquer comme terminée'
+            },
+            {
+                action: 'dismiss',
+                title: 'Ignorer'
+            }
+        ]
+    };
+
+    navigator.serviceWorker.ready.then((registration) => {
+        registration.showNotification(title, options);
+    });
 }
 
 // Gestion des messages reçus du service worker
@@ -81,6 +172,44 @@ function handleServiceWorkerMessage(event) {
             toggleTodo(parseInt(todoId));
         }
     }
+}
+
+// Programmer des notifications pour toutes les tâches actives
+function rescheduleTodosNotifications() {
+    if (notificationPermission !== 'granted') return;
+    
+    // Annuler toutes les notifications précédentes
+    navigator.serviceWorker.ready.then(registration => {
+        registration.getNotifications().then(notifications => {
+            notifications.forEach(notification => notification.close());
+        });
+    });
+    
+    // Reprogrammer les notifications pour les tâches actives
+    todos.forEach(todo => {
+        if (!todo.completed && todo.dueDate) {
+            scheduleNotification(todo);
+        }
+    });
+}
+
+// Programmer une notification pour une tâche
+function scheduleNotification(todo) {
+    if (!todo.dueDate || notificationPermission !== 'granted') return;
+    
+    // Envoi du message au service worker pour programmer la notification
+    navigator.serviceWorker.ready.then(registration => {
+        registration.active.postMessage({
+            type: 'SCHEDULE_NOTIFICATION',
+            payload: {
+                todo: {
+                    id: todo.id,
+                    text: todo.text,
+                    dueDate: todo.dueDate
+                }
+            }
+        });
+    });
 }
 
 // Gestion des tâches
@@ -102,8 +231,8 @@ function addTodo() {
         renderTodos();
         
         // Si une date est fixée, programmer une notification
-        if (dueDate && window.notificationHandler) {
-            window.notificationHandler.scheduleNotification(newTodo);
+        if (dueDate && notificationPermission === 'granted') {
+            scheduleNotification(newTodo);
         }
         
         // Réinitialiser les champs
@@ -122,12 +251,18 @@ function toggleTodo(id) {
     
     saveTodos();
     renderTodos();
+    
+    // Reprogrammer les notifications après modification
+    rescheduleTodosNotifications();
 }
 
 function deleteTodo(id) {
     todos = todos.filter(todo => todo.id !== id);
     saveTodos();
     renderTodos();
+    
+    // Reprogrammer les notifications après suppression
+    rescheduleTodosNotifications();
 }
 
 function clearCompleted() {

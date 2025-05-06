@@ -10,12 +10,14 @@ const STATIC_ASSETS = [
     './css/style.css',
     './js/app.js',
     './js/sw-register.js',
-    './js/notifications.js',
     './manifest.json',
     './images/icon-192x192.png',
     './images/icon-512x512.png',
     './images/favicon.ico'
 ];
+
+// Map des notifications programmées (id -> timeoutId)
+const scheduledNotifications = new Map();
 
 // Installation du Service Worker
 self.addEventListener('install', event => {
@@ -95,43 +97,85 @@ self.addEventListener('fetch', event => {
     );
 });
 
-// Gestion des notifications push
-self.addEventListener('push', event => {
-    console.log('[Service Worker] Notification push reçue');
+// Gestion des messages de l'application
+self.addEventListener('message', event => {
+    const data = event.data;
     
-    let notificationData = {};
+    if (data.type === 'SCHEDULE_NOTIFICATION') {
+        const todo = data.payload.todo;
+        
+        // Programmer les notifications
+        scheduleNotification(todo);
+    }
+});
+
+// Programmer une notification pour une tâche
+function scheduleNotification(todo) {
+    if (!todo.dueDate) return;
     
-    try {
-        notificationData = event.data.json();
-    } catch (e) {
-        notificationData = {
-            title: 'Notification',
-            body: event.data ? event.data.text() : 'Pas de contenu'
-        };
+    // Annuler les notifications existantes pour cette tâche
+    if (scheduledNotifications.has(todo.id)) {
+        clearTimeout(scheduledNotifications.get(todo.id));
+        scheduledNotifications.delete(todo.id);
     }
     
-    const options = {
-        body: notificationData.body || 'Détails non disponibles',
-        icon: './images/icon-192x192.png',
-        badge: './images/icon-192x192.png',
-        vibrate: [100, 50, 100],
-        data: notificationData.data || {},
-        actions: [
-            {
-                action: 'complete',
-                title: 'Marquer comme terminée'
-            },
-            {
-                action: 'dismiss',
-                title: 'Ignorer'
-            }
-        ]
-    };
+    const now = new Date();
+    const dueDate = new Date(todo.dueDate);
     
-    event.waitUntil(
-        self.registration.showNotification(notificationData.title, options)
-    );
-});
+    // Si la date est déjà passée, ne pas programmer de notification
+    if (dueDate <= now) return;
+    
+    const timeUntilDue = dueDate.getTime() - now.getTime();
+    
+    // Programmer une notification à l'heure exacte
+    const notificationId = setTimeout(() => {
+        self.registration.showNotification('Rappel de tâche', {
+            body: `Il est temps de : ${todo.text}`,
+            icon: './images/icon-192x192.png',
+            badge: './images/icon-192x192.png',
+            vibrate: [100, 50, 100],
+            data: { todoId: todo.id },
+            actions: [
+                {
+                    action: 'complete',
+                    title: 'Marquer comme terminée'
+                },
+                {
+                    action: 'dismiss',
+                    title: 'Ignorer'
+                }
+            ]
+        });
+        
+        scheduledNotifications.delete(todo.id);
+    }, timeUntilDue);
+    
+    scheduledNotifications.set(todo.id, notificationId);
+    
+    // Si plus de 15 minutes avant l'échéance, programmer une notification de rappel
+    const reminderTime = timeUntilDue - (15 * 60 * 1000);
+    if (reminderTime > 0) {
+        setTimeout(() => {
+            self.registration.showNotification('Rappel de tâche', {
+                body: `Dans 15 minutes : ${todo.text}`,
+                icon: './images/icon-192x192.png',
+                badge: './images/icon-192x192.png',
+                vibrate: [100, 50, 100],
+                data: { todoId: todo.id },
+                actions: [
+                    {
+                        action: 'complete',
+                        title: 'Marquer comme terminée'
+                    },
+                    {
+                        action: 'dismiss',
+                        title: 'Ignorer'
+                    }
+                ]
+            });
+        }, reminderTime);
+    }
+}
 
 // Gestion des clics sur les notifications
 self.addEventListener('notificationclick', event => {
@@ -139,7 +183,7 @@ self.addEventListener('notificationclick', event => {
     
     const notification = event.notification;
     const action = event.action;
-    const todoId = notification.data && notification.data.id;
+    const data = notification.data;
     
     notification.close();
     
@@ -147,11 +191,11 @@ self.addEventListener('notificationclick', event => {
         return;
     }
     
-    // Si l'utilisateur a cliqué sur la notification elle-même ou sur le bouton "complete"
+    // URL pour ouvrir l'application
     const urlToOpen = new URL('./index.html', self.location.origin);
     
-    // Envoi d'un message à l'application pour marquer la tâche comme terminée si nécessaire
-    if (action === 'complete' && todoId) {
+    // Si l'utilisateur a cliqué sur "complete", envoyer un message pour marquer la tâche comme terminée
+    if (action === 'complete' && data && data.todoId) {
         event.waitUntil(
             self.clients.matchAll({
                 type: 'window',
@@ -163,7 +207,7 @@ self.addEventListener('notificationclick', event => {
                         type: 'NOTIFICATION_ACTION',
                         payload: {
                             action: 'complete',
-                            todoId: todoId
+                            todoId: data.todoId
                         }
                     });
                     return client.focus();
@@ -190,56 +234,4 @@ self.addEventListener('notificationclick', event => {
             })
         );
     }
-});
-
-// Gestion des événements de synchronisation périodique
-self.addEventListener('periodicsync', event => {
-    if (event.tag === 'check-todos') {
-        console.log('[Service Worker] Vérification périodique des tâches');
-        event.waitUntil(checkTodos());
-    }
-});
-
-// Vérifier les tâches pour les notifications
-async function checkTodos() {
-    try {
-        // Récupérer les tâches depuis le stockage
-        const todosResponse = await caches.match(new Request('./todos-data'));
-        if (!todosResponse) return;
-        
-        const todos = await todosResponse.json();
-        const now = new Date();
-        
-        // Vérifier les tâches avec des dates d'échéance proches
-        todos.forEach(todo => {
-            if (todo.dueDate && !todo.completed) {
-                const dueDate = new Date(todo.dueDate);
-                const diffTime = dueDate.getTime() - now.getTime();
-                const diffMinutes = diffTime / (1000 * 60);
-                
-                // Notifier si moins de 30 minutes avant l'échéance
-                if (diffMinutes > 0 && diffMinutes < 30) {
-                    self.registration.showNotification('Rappel de tâche', {
-                        body: `Bientôt à faire : ${todo.text}`,
-                        icon: './images/icon-192x192.png',
-                        badge: './images/icon-192x192.png',
-                        vibrate: [100, 50, 100],
-                        data: { id: todo.id },
-                        actions: [
-                            {
-                                action: 'complete',
-                                title: 'Marquer comme terminée'
-                            },
-                            {
-                                action: 'dismiss',
-                                title: 'Ignorer'
-                            }
-                        ]
-                    });
-                }
-            }
-        });
-    } catch (error) {
-        console.error('[Service Worker] Erreur lors de la vérification des tâches:', error);
-    }
-} 
+}); 

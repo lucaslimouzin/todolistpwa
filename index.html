@@ -17,15 +17,19 @@
         </header>
         
         <div class="todo-form">
-            <input type="text" id="todo-input" placeholder="Ajouter une tâche...">
-            <input type="datetime-local" id="todo-date" aria-label="Date d'échéance">
+            <div class="todo-inputs">
+                <input type="text" id="todo-input" placeholder="Ajouter une tâche...">
+                <input type="datetime-local" id="todo-date" aria-label="Date d'échéance">
+            </div>
             <button id="add-todo">Ajouter</button>
         </div>
         
         <div class="permissions-banner" id="notifications-banner">
-            <p>Autoriser les notifications pour recevoir des rappels</p>
-            <button id="enable-notifications">Activer</button>
-            <button id="close-notifications-banner">×</button>
+            <p class="banner-text">Autoriser les notifications pour recevoir des rappels</p>
+            <div class="banner-actions">
+                <button id="enable-notifications">Activer</button>
+                <button id="close-notifications-banner">×</button>
+            </div>
         </div>
         
         <div class="filters">
@@ -43,13 +47,14 @@
     </div>
 
     <div class="install-banner" id="install-banner">
-        <p>Installez cette application sur votre appareil</p>
-        <button id="install-btn">Installer</button>
-        <button id="close-banner">×</button>
+        <p class="banner-text">Installez cette application sur votre appareil</p>
+        <div class="banner-actions">
+            <button id="install-btn">Installer</button>
+            <button id="close-banner">×</button>
+        </div>
     </div>
 
     <script src="js/app.js"></script>
     <script src="js/sw-register.js"></script>
-    <script src="js/notifications.js"></script>
 </body>
 </html> 
