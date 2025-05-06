@@ -6,6 +6,7 @@
     --completed-color: #888;
     --delete-color: #e74c3c;
     --shadow-color: rgba(0, 0, 0, 0.1);
+    --notification-color: #2ecc71;
 }
 
 * {
@@ -45,10 +46,18 @@ header {
 }
 
 #todo-input {
-    flex: 1;
+    flex: 2;
     padding: 10px;
     border: 1px solid var(--border-color);
     border-radius: 4px 0 0 4px;
+    font-size: 16px;
+}
+
+#todo-date {
+    flex: 1;
+    padding: 10px;
+    border: 1px solid var(--border-color);
+    border-left: none;
     font-size: 16px;
 }
 
@@ -111,8 +120,14 @@ header {
     cursor: pointer;
 }
 
-.todo-text {
+.todo-content {
     flex: 1;
+    display: flex;
+    flex-direction: column;
+    margin: 0 10px;
+}
+
+.todo-text {
     font-size: 16px;
     word-break: break-word;
 }
@@ -157,13 +172,11 @@ header {
     color: var(--delete-color);
 }
 
-.install-banner {
+.install-banner, .permissions-banner {
     position: fixed;
     bottom: 0;
     left: 0;
     right: 0;
-    background-color: var(--primary-color);
-    color: white;
     padding: 15px;
     display: flex;
     justify-content: space-between;
@@ -172,7 +185,17 @@ header {
     display: none;
 }
 
-#install-btn, #close-banner {
+.install-banner {
+    background-color: var(--primary-color);
+    color: white;
+}
+
+.permissions-banner {
+    background-color: var(--notification-color);
+    color: white;
+}
+
+#install-btn, #close-banner, #enable-notifications, #close-notifications-banner {
     background-color: white;
     border: none;
     padding: 8px 15px;
@@ -181,18 +204,35 @@ header {
     margin-left: 10px;
 }
 
-#install-btn {
-    color: var(--primary-color);
+#install-btn, #enable-notifications {
     font-weight: bold;
 }
 
-#close-banner {
+#install-btn {
+    color: var(--primary-color);
+}
+
+#enable-notifications {
+    color: var(--notification-color);
+}
+
+#close-banner, #close-notifications-banner {
     width: 30px;
     height: 30px;
     display: flex;
     align-items: center;
     justify-content: center;
     font-size: 20px;
+}
+
+.todo-date {
+    font-size: 12px;
+    color: #888;
+    margin-left: 10px;
+}
+
+.todo-date.urgent {
+    color: var(--delete-color);
 }
 
 @media (max-width: 600px) {

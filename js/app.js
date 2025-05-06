@@ -5,6 +5,7 @@
 
 // DOM Elements
 const todoInput = document.getElementById('todo-input');
+const todoDateInput = document.getElementById('todo-date');
 const addTodoBtn = document.getElementById('add-todo');
 const todoList = document.getElementById('todo-list');
 const itemsLeft = document.getElementById('items-left');
@@ -63,24 +64,51 @@ function addEventListeners() {
             installBanner.style.display = 'flex';
         }
     });
+
+    // Gestion des notifications provenant du service worker
+    navigator.serviceWorker.addEventListener('message', handleServiceWorkerMessage);
+}
+
+// Gestion des messages reçus du service worker
+function handleServiceWorkerMessage(event) {
+    const { type, payload } = event.data;
+    
+    if (type === 'NOTIFICATION_ACTION') {
+        const { action, todoId } = payload;
+        
+        if (action === 'complete') {
+            // Marquer la tâche comme terminée
+            toggleTodo(parseInt(todoId));
+        }
+    }
 }
 
 // Gestion des tâches
 function addTodo() {
     const text = todoInput.value.trim();
+    const dueDate = todoDateInput.value;
     
     if (text) {
         const newTodo = {
             id: Date.now(),
             text: text,
             completed: false,
-            createdAt: new Date().toISOString()
+            createdAt: new Date().toISOString(),
+            dueDate: dueDate || null
         };
         
         todos.push(newTodo);
         saveTodos();
         renderTodos();
+        
+        // Si une date est fixée, programmer une notification
+        if (dueDate && window.notificationHandler) {
+            window.notificationHandler.scheduleNotification(newTodo);
+        }
+        
+        // Réinitialiser les champs
         todoInput.value = '';
+        todoDateInput.value = '';
     }
 }
 
@@ -144,6 +172,41 @@ function getFilteredTodos() {
     }
 }
 
+// Format de date pour l'affichage
+function formatDate(dateString) {
+    if (!dateString) return '';
+    
+    const date = new Date(dateString);
+    const now = new Date();
+    const isToday = date.toDateString() === now.toDateString();
+    
+    const options = { 
+        hour: '2-digit', 
+        minute: '2-digit'
+    };
+    
+    if (!isToday) {
+        options.day = '2-digit';
+        options.month = 'short';
+    }
+    
+    return isToday 
+        ? `Aujourd'hui à ${date.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}` 
+        : date.toLocaleDateString('fr-FR', options);
+}
+
+// Vérifier si une date est proche
+function isDateSoon(dateString) {
+    if (!dateString) return false;
+    
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffTime = date.getTime() - now.getTime();
+    const diffHours = diffTime / (1000 * 60 * 60);
+    
+    return diffHours > 0 && diffHours < 24;
+}
+
 // Rendu et affichage
 function renderTodos() {
     const filteredTodos = getFilteredTodos();
@@ -166,9 +229,22 @@ function renderTodos() {
             checkbox.className = 'todo-checkbox';
             checkbox.checked = todo.completed;
             
+            const textContainer = document.createElement('div');
+            textContainer.className = 'todo-content';
+            
             const text = document.createElement('span');
             text.className = 'todo-text';
             text.textContent = todo.text;
+            
+            textContainer.appendChild(text);
+            
+            // Ajouter la date d'échéance si elle existe
+            if (todo.dueDate) {
+                const dateSpan = document.createElement('span');
+                dateSpan.className = `todo-date${isDateSoon(todo.dueDate) ? ' urgent' : ''}`;
+                dateSpan.textContent = formatDate(todo.dueDate);
+                textContainer.appendChild(dateSpan);
+            }
             
             const deleteBtn = document.createElement('button');
             deleteBtn.className = 'delete-todo';
@@ -176,7 +252,7 @@ function renderTodos() {
             deleteBtn.setAttribute('aria-label', 'Supprimer la tâche');
             
             li.appendChild(checkbox);
-            li.appendChild(text);
+            li.appendChild(textContainer);
             li.appendChild(deleteBtn);
             
             todoList.appendChild(li);
